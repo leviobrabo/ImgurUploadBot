@@ -3,12 +3,15 @@ import pyimgur
 import logging
 import os
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated
+import time
 
 
 from pymongo import MongoClient
 
 # Configuração de logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+current_client_id_index = 0
 
 TELEGRAM_BOT_TOKEN = '7856110659:AAGlLzlZEzq1CRMfN0gSA6c1RBhiwWZOuP4'
 IMGUR_CLIENT_IDS = [
@@ -26,7 +29,7 @@ BOT_OWNER_ID = '5307669416'
 
 
 
-current_client_id_index = 0
+
 
 
 
@@ -119,12 +122,13 @@ def set_user_language(user_id, lang):
 def get_next_client_id():
     global current_client_id_index
     client_id = IMGUR_CLIENT_IDS[current_client_id_index]
-    current_client_id_index = (current_client_id_index + 1) % len(IMGUR_CLIENT_IDS)
+    current_client_id_index = (current_client_id_index + 1) % len(IMGUR_CLIENT_IDS)  # Vai para o próximo CLIENT_ID
     return client_id
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 client_id = get_next_client_id()
 im = pyimgur.Imgur(client_id)
+retries = 5
 
 def send_new_group_message(chat):
     try:
@@ -255,8 +259,27 @@ def start(message):
     if lang == 'pt-br':
         text = f"👋 Olá, {first_name}! Eu sou um bot que ajuda a fazer upload de imagens para o Imgur. Envie uma foto, e eu retornarei um link direto para acessá-la."
     bot.send_message(message.chat.id, text, message_thread_id=message.message_thread_id)
+# Função para fazer o upload da imagem com retries
+def upload_image_with_retries(image_path, retries=5, delay=5):
+    attempts = 0
+    while attempts < retries:
+        try:
+            # Tente fazer o upload da imagem
+            uploaded_image = im.upload_image(image_path, title=f"Uploaded by {message.from_user.username}")
+            return uploaded_image
+        except Exception as e:
+            # Verifica se o erro é de capacidade (código 429)
+            if '429' in str(e):
+                logging.error(f"Imgur está temporariamente fora de capacidade. Tentando novamente em {delay} segundos...")
+                time.sleep(delay)  # Aguarda antes de tentar novamente
+                attempts += 1
+            else:
+                # Se o erro não for de capacidade, lança o erro
+                logging.error(f"Ocorreu um erro inesperado: {e}")
+                raise
+    # Se atingiu o número máximo de tentativas, retorna None
+    return None
 
-# Detecta qualquer foto enviada pelo usuário e faz o upload automaticamente
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
     bot.send_chat_action(message.chat.id, 'typing')
@@ -273,7 +296,7 @@ def handle_photo(message):
             text = "⚠️ You are not in the channel! Please join the channel to continue."
         
         keyboard = InlineKeyboardMarkup()
-        button = InlineKeyboardButton(text="Join Channel", url=f"https://t.me/{CHANNEL[1:]}")
+        button = InlineKeyboardButton(text="Join Channel", url=f"https://t.me/{CHANNEL[1:]}")  # Corrigido a URL
         keyboard.add(button)
         bot.send_message(message.chat.id, text, reply_markup=keyboard, message_thread_id=message.message_thread_id)
         return
@@ -307,12 +330,13 @@ def handle_photo(message):
 
         bot.edit_message_text(chat_id=message.chat.id, message_id=status_message.message_id, text=text_2)
 
-        # Faz o upload para o Imgur
-        logging.info("Fazendo upload da imagem para o Imgur...")
-        uploaded_image = im.upload_image(image_path, title=f"Uploaded by {message.from_user.username}")
+        # Tenta fazer o upload com retries
+        uploaded_image = upload_image_with_retries(image_path)
+
+        if uploaded_image is None:
+            raise Exception("Falha ao fazer o upload após várias tentativas.")
 
         # Atualiza a mensagem com o link da imagem
-
         if user_lang == 'pt-br':
             text_3 = ( f"✅ Imagem enviada com sucesso!\n\n<code>{uploaded_image.link}</code>\n\n"
                  f"Caso queira acessar, clique aqui: <a href='{uploaded_image.link}'>Clique aqui</a>", )
