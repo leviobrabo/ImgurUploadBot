@@ -173,7 +173,6 @@ def send_group_greeting(message: ChatMemberUpdated):
             chat_name = message.chat.title
 
             if str(chat_id) in [CHANNEL, GROUP_LOG]:
-
                 logging.warning(
                     f"Ignorando armazenamento de chat com ID {chat_id}, pois corresponde a um ID configurado."
                 )
@@ -360,7 +359,8 @@ def handle_photo(message):
         bot.edit_message_text(chat_id=message.chat.id, message_id=status_message.message_id, text=text_2)
 
         # Tenta fazer o upload com retries
-        uploaded_image = upload_image_with_retries(image_path, message)
+        uploaded_image = upload_image_with_retries(image_path, retries=5)
+
 
         if uploaded_image is None:
             raise Exception("Falha ao fazer o upload após várias tentativas.")
