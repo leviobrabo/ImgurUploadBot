@@ -11,11 +11,25 @@ from pymongo import MongoClient
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 TELEGRAM_BOT_TOKEN = '7856110659:AAGlLzlZEzq1CRMfN0gSA6c1RBhiwWZOuP4'
-IMGUR_CLIENT_ID = '52ba35ee0e3c4ad'
+IMGUR_CLIENT_IDS = [
+    '52ba35ee0e3c4ad',  # Primeiro CLIENT_ID
+    '1cc96860f56a466',  # Segundo CLIENT_ID
+    '3d160bdbec22287',  # Terceiro CLIENT_ID
+    '17009f6715a5b76',
+    '41400761c15a7b5'
+]
+
 MONGO_CON = 'mongodb+srv://starvoisx:levi123@cluster0.tec213s.mongodb.net/?retryWrites=true&w=majority'
 CHANNEL = '@lbrabo' 
 GROUP_LOG = '-1001962261893'
 BOT_OWNER_ID = '5307669416'
+
+
+
+current_client_id_index = 0
+
+
+
 # banco de dados
 
 # Função para verificar se o usuário está no canal
@@ -102,9 +116,15 @@ def update_user_lang(user_id, lang):
 def set_user_language(user_id, lang):
     db.users.update_one({'user_id': user_id}, {'$set': {'lang': lang}})
 
+def get_next_client_id():
+    global current_client_id_index
+    client_id = IMGUR_CLIENT_IDS[current_client_id_index]
+    current_client_id_index = (current_client_id_index + 1) % len(IMGUR_CLIENT_IDS)
+    return client_id
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
-im = pyimgur.Imgur(IMGUR_CLIENT_ID)
+client_id = get_next_client_id()
+im = pyimgur.Imgur(client_id)
 
 def send_new_group_message(chat):
     try:
