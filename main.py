@@ -1,5 +1,6 @@
 import telebot
-import pyimgur
+import requests
+
 import logging
 import os
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated
@@ -30,7 +31,21 @@ BOT_OWNER_ID = '5307669416'
 
 
 
-
+# Função para buscar imagens no feed do Imgur
+def get_imgur_feed():
+    client_id = get_next_client_id()
+    url = "https://api.imgur.com/3/feed"
+    headers = {
+        'Authorization': f'Bearer {client_id}'  # Acesso com o token do cliente Imgur
+    }
+    
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # Levanta um erro se o status não for 200 (OK)
+        return response.json()  # Retorna a resposta em formato JSON
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Erro ao obter feed do Imgur: {e}")
+        return None
 
 
 # banco de dados
@@ -127,7 +142,6 @@ def get_next_client_id():
 
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
 client_id = get_next_client_id()
-im = pyimgur.Imgur(client_id)
 retries = 5
 
 def send_new_group_message(chat):
@@ -261,24 +275,37 @@ def start(message):
     bot.send_message(message.chat.id, text, message_thread_id=message.message_thread_id)
 # Função para fazer o upload da imagem com retries
 
-def upload_image_with_retries(image_path, message, retries=5, delay=5):
+# Função para fazer o upload da imagem com retries usando requests
+def upload_image_with_retries(image_path, retries=5, delay=5):
     attempts = 0
     while attempts < retries:
         try:
-            # Tente fazer o upload da imagem
-            uploaded_image = im.upload_image(image_path, title=f"Uploaded by {message.from_user.username}")
-            return uploaded_image
+            # Pega o client_id do Imgur
+            client_id = get_next_client_id()
+            url = "https://api.imgur.com/3/upload"
+            headers = {
+                'Authorization': f'Client-ID {client_id}'
+            }
+            
+            # Abre o arquivo de imagem e faz o upload
+            with open(image_path, 'rb') as img_file:
+                files = {'image': img_file}
+                response = requests.post(url, headers=headers, files=files)
+            
+            # Checa se o upload foi bem-sucedido
+            if response.status_code == 200:
+                data = response.json()
+                return data['data']  # Retorna as informações da imagem, incluindo o link
+            else:
+                raise Exception(f"Erro ao fazer o upload: {response.status_code} - {response.text}")
         except Exception as e:
-            # Verifica se o erro é de capacidade (código 429)
+            logging.error(f"Erro ao tentar upload da imagem: {e}")
             if '429' in str(e):
                 logging.error(f"Imgur está temporariamente fora de capacidade. Tentando novamente em {delay} segundos...")
                 time.sleep(delay)  # Aguarda antes de tentar novamente
                 attempts += 1
             else:
-                # Se o erro não for de capacidade, lança o erro
-                logging.error(f"Ocorreu um erro inesperado: {e}")
-                raise
-    # Se atingiu o número máximo de tentativas, retorna None
+                raise  # Se o erro não for de capacidade, lança o erro
     return None
 
 @bot.message_handler(content_types=['photo'])
