@@ -260,7 +260,8 @@ def start(message):
         text = f"👋 Olá, {first_name}! Eu sou um bot que ajuda a fazer upload de imagens para o Imgur. Envie uma foto, e eu retornarei um link direto para acessá-la."
     bot.send_message(message.chat.id, text, message_thread_id=message.message_thread_id)
 # Função para fazer o upload da imagem com retries
-def upload_image_with_retries(image_path, retries=5, delay=5):
+
+def upload_image_with_retries(image_path, message, retries=5, delay=5):
     attempts = 0
     while attempts < retries:
         try:
