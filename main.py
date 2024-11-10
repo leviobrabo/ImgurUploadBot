@@ -172,7 +172,8 @@ def send_group_greeting(message: ChatMemberUpdated):
             chat_id = message.chat.id
             chat_name = message.chat.title
 
-            if chat_id in [CHANNEL, GROUP_LOG]:
+            if str(chat_id) in [CHANNEL, GROUP_LOG]:
+
                 logging.warning(
                     f"Ignorando armazenamento de chat com ID {chat_id}, pois corresponde a um ID configurado."
                 )
