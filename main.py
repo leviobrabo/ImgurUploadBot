@@ -267,26 +267,24 @@ def start(message):
 
 
 
-# Função para fazer upload da imagem para o Imgur
-def upload_image_to_imgur(image_path, client_id, access_token):
-    URL = "https://api.imgur.com/oauth2/token"
-    payload = {
-        'refresh_token': refresh_token,
-        'client_id': IMGUR_CLIENT_IDS,
-        'grant_type': 'refresh_token'
-    }
-    headers = {"Authorization": f"Bearer {access_token}"}
-    
-    with open(image_path, "rb") as image_file:
-        files = {"image": image_file}
-        response = requests.post(url, headers=headers, files=files)
-        
-    if response.status_code == 200:
-        data = response.json()
-        return data['data']['link']
-    else:
-        logging.error(f"Erro ao enviar imagem: {response.text}")
-        return None
+def upload_image_with_retries(image_path):
+    """
+    Função para tentar fazer o upload da imagem no Imgur com tentativas em caso de falhas.
+    """
+    client_id = get_next_client_id()
+    im = pyimgur.Imgur(client_id)
+
+    retries = 5
+    for attempt in range(retries):
+        try:
+            uploaded_image = im.upload_image(image_path, title="Uploaded by Bot")
+            logging.info(f"Imagem carregada com sucesso! Link: {uploaded_image.link}")
+            return uploaded_image.link
+        except Exception as e:
+            logging.error(f"Erro ao carregar imagem no Imgur (tentativa {attempt + 1}/{retries}): {e}")
+            time.sleep(2 ** attempt)  # Exponencial backoff em caso de falha
+    logging.error("Falhou em carregar a imagem após várias tentativas.")
+    return None
 
 
 @bot.message_handler(content_types=['photo'])
