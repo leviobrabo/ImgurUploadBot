@@ -338,7 +338,7 @@ def handle_photo(message):
         bot.edit_message_text(chat_id=message.chat.id, message_id=status_message.message_id, text=text_2)
 
         # Tenta fazer o upload com retries
-        uploaded_image = upload_image_with_retries(image_path, message)
+        uploaded_image = upload_image_with_retries(image_path)
 
         if uploaded_image is None:
             raise Exception("Falha ao fazer o upload após várias tentativas.")
