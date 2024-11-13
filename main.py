@@ -267,47 +267,26 @@ def start(message):
 
 
 
-def upload_image_with_retries(image_path, message, retries=5, delay=5):
-    attempts = 0
-    while attempts < retries:
-        try:
-            # Troca o client_id para evitar sobrecarga no mesmo ID
-            client_id = get_next_client_id()
-            headers = {"Authorization": f"Client-ID {client_id}"}
-            url = "https://api.imgur.com/3/image"
-            
-            with open(image_path, "rb") as image_file:
-                # Faz o upload diretamente via requests
-                response = requests.post(
-                    url,
-                    headers=headers,
-                    files={"image": image_file},
-                    timeout=10
-                )
-
-            # Verifica se o upload foi bem-sucedido
-            if response.status_code == 200:
-                logging.info("Upload bem-sucedido.")
-                return response.json()["data"]["link"]  # Retorna o link da imagem
-
-            # Se o erro for por limite de capacidade
-            if response.status_code == 429:
-                logging.warning(f"Limite de capacidade excedido. Tentando novamente em {delay} segundos.")
-                time.sleep(delay)
-                attempts += 1
-            else:
-                logging.error(f"Erro ao fazer upload: {response.status_code} - {response.text}")
-                return None
-        except requests.exceptions.SSLError as e:
-            logging.error(f"Erro SSL: {e}. Tentando novamente em {delay} segundos.")
-            time.sleep(delay)
-            attempts += 1
-        except Exception as e:
-            logging.error(f"Ocorreu um erro inesperado: {e}")
-            return None
-    logging.error("Número máximo de tentativas atingido. O upload falhou.")
-    return None
-
+# Função para fazer upload da imagem para o Imgur
+def upload_image_to_imgur(image_path, client_id, access_token):
+    URL = "https://api.imgur.com/oauth2/token"
+    payload = {
+        'refresh_token': refresh_token,
+        'client_id': IMGUR_CLIENT_IDS,
+        'grant_type': 'refresh_token'
+    }
+    headers = {"Authorization": f"Bearer {access_token}"}
+    
+    with open(image_path, "rb") as image_file:
+        files = {"image": image_file}
+        response = requests.post(url, headers=headers, files=files)
+        
+    if response.status_code == 200:
+        data = response.json()
+        return data['data']['link']
+    else:
+        logging.error(f"Erro ao enviar imagem: {response.text}")
+        return None
 
 
 @bot.message_handler(content_types=['photo'])
