@@ -5,6 +5,10 @@ import os
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated
 import time
 
+import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
 
 from pymongo import MongoClient
 
@@ -261,24 +265,49 @@ def start(message):
     bot.send_message(message.chat.id, text, message_thread_id=message.message_thread_id)
 # Função para fazer o upload da imagem com retries
 
+
 def upload_image_with_retries(image_path, message, retries=5, delay=5):
     attempts = 0
+    client_id = get_next_client_id()
+    headers = {"Authorization": f"Client-ID {client_id}"}
+    url = "https://api.imgur.com/3/image"
+
     while attempts < retries:
         try:
-            # Tente fazer o upload da imagem
-            uploaded_image = im.upload_image(image_path, title=f"Uploaded by {message.from_user.username}")
-            return uploaded_image
-        except Exception as e:
-            # Verifica se o erro é de capacidade (código 429)
-            if '429' in str(e):
-                logging.error(f"Imgur está temporariamente fora de capacidade. Tentando novamente em {delay} segundos...")
+            with open(image_path, "rb") as image_file:
+                # Upload com `requests` configurado para lidar com problemas SSL
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    files={"image": image_file},
+                    timeout=10,  # Timeout para evitar longas esperas
+                )
+                
+            # Verifica se a resposta foi bem-sucedida
+            if response.status_code == 200:
+                logging.info("Upload bem-sucedido.")
+                return response.json()["data"]["link"]  # Retorna o link da imagem
+
+            # Caso contrário, registra o erro
+            logging.error(f"Erro ao fazer upload: {response.status_code} - {response.text}")
+            
+            if response.status_code == 429:
+                logging.warning(f"Limite de capacidade excedido. Tentando novamente em {delay} segundos.")
                 time.sleep(delay)  # Aguarda antes de tentar novamente
                 attempts += 1
             else:
                 # Se o erro não for de capacidade, lança o erro
-                logging.error(f"Ocorreu um erro inesperado: {e}")
-                raise
-    # Se atingiu o número máximo de tentativas, retorna None
+                logging.error(f"Ocorreu um erro: {response.text}")
+                return None
+        except requests.exceptions.SSLError as e:
+            logging.error(f"Erro SSL: {e}. Tentando novamente em {delay} segundos.")
+            time.sleep(delay)
+            attempts += 1
+        except Exception as e:
+            logging.error(f"Ocorreu um erro inesperado: {e}")
+            return None
+    # Se o número de tentativas foi excedido
+    logging.error("Número máximo de tentativas atingido. O upload falhou.")
     return None
 
 @bot.message_handler(content_types=['photo'])
