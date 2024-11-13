@@ -266,38 +266,37 @@ def start(message):
 # Função para fazer o upload da imagem com retries
 
 
+
 def upload_image_with_retries(image_path, message, retries=5, delay=5):
     attempts = 0
-    client_id = get_next_client_id()
-    headers = {"Authorization": f"Client-ID {client_id}"}
-    url = "https://api.imgur.com/3/image"
-
     while attempts < retries:
         try:
+            # Troca o client_id para evitar sobrecarga no mesmo ID
+            client_id = get_next_client_id()
+            headers = {"Authorization": f"Client-ID {client_id}"}
+            url = "https://api.imgur.com/3/image"
+            
             with open(image_path, "rb") as image_file:
-                # Upload com `requests` configurado para lidar com problemas SSL
+                # Faz o upload diretamente via requests
                 response = requests.post(
                     url,
                     headers=headers,
                     files={"image": image_file},
-                    timeout=10,  # Timeout para evitar longas esperas
+                    timeout=10
                 )
-                
-            # Verifica se a resposta foi bem-sucedida
+
+            # Verifica se o upload foi bem-sucedido
             if response.status_code == 200:
                 logging.info("Upload bem-sucedido.")
                 return response.json()["data"]["link"]  # Retorna o link da imagem
 
-            # Caso contrário, registra o erro
-            logging.error(f"Erro ao fazer upload: {response.status_code} - {response.text}")
-            
+            # Se o erro for por limite de capacidade
             if response.status_code == 429:
                 logging.warning(f"Limite de capacidade excedido. Tentando novamente em {delay} segundos.")
-                time.sleep(delay)  # Aguarda antes de tentar novamente
+                time.sleep(delay)
                 attempts += 1
             else:
-                # Se o erro não for de capacidade, lança o erro
-                logging.error(f"Ocorreu um erro: {response.text}")
+                logging.error(f"Erro ao fazer upload: {response.status_code} - {response.text}")
                 return None
         except requests.exceptions.SSLError as e:
             logging.error(f"Erro SSL: {e}. Tentando novamente em {delay} segundos.")
@@ -306,9 +305,10 @@ def upload_image_with_retries(image_path, message, retries=5, delay=5):
         except Exception as e:
             logging.error(f"Ocorreu um erro inesperado: {e}")
             return None
-    # Se o número de tentativas foi excedido
     logging.error("Número máximo de tentativas atingido. O upload falhou.")
     return None
+
+
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
