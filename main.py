@@ -5,6 +5,10 @@ import os
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated
 import time
 
+import requests
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
 
 from pymongo import MongoClient
 
@@ -260,25 +264,27 @@ def start(message):
     bot.send_message(message.chat.id, text, message_thread_id=message.message_thread_id)
 # Função para fazer o upload da imagem com retries
 
-def upload_image_with_retries(image_path, message, retries=5, delay=5):
-    attempts = 0
-    while attempts < retries:
+
+
+def upload_image_with_retries(image_path):
+    """
+    Função para tentar fazer o upload da imagem no Imgur com tentativas em caso de falhas.
+    """
+    client_id = get_next_client_id()
+    im = pyimgur.Imgur(client_id)
+
+    retries = 5
+    for attempt in range(retries):
         try:
-            # Tente fazer o upload da imagem
-            uploaded_image = im.upload_image(image_path, title=f"Uploaded by {message.from_user.username}")
-            return uploaded_image
+            uploaded_image = im.upload_image(image_path, title="Uploaded by Bot")
+            logging.info(f"Imagem carregada com sucesso! Link: {uploaded_image.link}")
+            return uploaded_image.link
         except Exception as e:
-            # Verifica se o erro é de capacidade (código 429)
-            if '429' in str(e):
-                logging.error(f"Imgur está temporariamente fora de capacidade. Tentando novamente em {delay} segundos...")
-                time.sleep(delay)  # Aguarda antes de tentar novamente
-                attempts += 1
-            else:
-                # Se o erro não for de capacidade, lança o erro
-                logging.error(f"Ocorreu um erro inesperado: {e}")
-                raise
-    # Se atingiu o número máximo de tentativas, retorna None
+            logging.error(f"Erro ao carregar imagem no Imgur (tentativa {attempt + 1}/{retries}): {e}")
+            time.sleep(2 ** attempt)  # Exponencial backoff em caso de falha
+    logging.error("Falhou em carregar a imagem após várias tentativas.")
     return None
+
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
@@ -330,7 +336,7 @@ def handle_photo(message):
         bot.edit_message_text(chat_id=message.chat.id, message_id=status_message.message_id, text=text_2)
 
         # Tenta fazer o upload com retries
-        uploaded_image = upload_image_with_retries(image_path, message)
+        uploaded_image = upload_image_with_retries(image_path)
 
         if uploaded_image is None:
             raise Exception("Falha ao fazer o upload após várias tentativas.")
