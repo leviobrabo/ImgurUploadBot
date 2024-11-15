@@ -125,7 +125,7 @@ def get_next_client_id():
     current_client_id_index = (current_client_id_index + 1) % len(IMGUR_CLIENT_IDS)  # Vai para o próximo CLIENT_ID
     return client_id
 
-bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
+bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN, parse_mode="HTML")
 client_id = get_next_client_id()
 im = pyimgur.Imgur(client_id)
 retries = 5
