@@ -2,7 +2,7 @@ import telebot
 import pyimgur
 import logging
 import os
-from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated
+from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated, LabeledPrice
 import time
 
 from pymongo import MongoClient
