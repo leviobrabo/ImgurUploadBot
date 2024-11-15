@@ -524,7 +524,7 @@ def callback_handler(call):
                     description=description,
                     currency='XTR',  
                     prices=[
-                        telebot.LabeledPrice(label=f'{selected_stars} Stars', amount=selected_stars )  
+                        telebot.types.LabeledPrice(label=f'{selected_stars} Stars', amount=selected_stars )  
                     ],
                     start_parameter=f'stars_{selected_stars}',
                     invoice_payload=f'stars_{selected_stars}',
