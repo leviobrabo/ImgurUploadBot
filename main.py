@@ -5,7 +5,6 @@ import os
 from telebot.types import InlineKeyboardButton, InlineKeyboardMarkup, ChatMemberUpdated
 import time
 
-
 from pymongo import MongoClient
 
 # Configuração de logging
@@ -420,6 +419,185 @@ def cmd_stats(message):
                 bot.reply_to(message, f'\n──❑ 「 Bot Stats 」 ❑──\n\n{user_stats}')
         except Exception as e:
             logging.error(f'Erro ao enviar o stats do bot: {e}')
+
+
+# donate
+
+@bot.message_handler(commands=['donate'])
+def donate(message):
+    user_id = message.from_user.id
+    first_name = message.from_user.first_name
+    
+    user = search_user(user_id)    
+    lang = get_user_lang(message.from_user.id)
+
+    if lang == 'pt-br':
+        text = (
+            f"👋 Olá, {first_name}!\n\n"
+            "Nosso projeto depende da sua ajuda para continuar funcionando. 🙏\n"
+            "As doações são usadas para cobrir custos de manutenção e servidores, garantindo que possamos melhorar continuamente o serviço.\n\n"
+            "Se você puder, considere fazer uma doação e ajudar a manter o projeto ativo!\n\n"
+            "Muito obrigado por apoiar nossa missão! 💖"
+        )
+    else:
+        text = (
+            f"👋 Hi, {first_name}!\n\n"
+            "Our project relies on your help to keep running. 🙏\n"
+            "Donations are used to cover maintenance and server costs, ensuring we can continuously improve the service.\n\n"
+            "If you can, consider making a donation to help keep the project alive!\n\n"
+            "Thank you so much for supporting our mission! 💖"
+        )
+    markup = InlineKeyboardMarkup()
+    markup = InlineKeyboardMarkup()
+    btn_50 = InlineKeyboardButton('⭐️ 50 stars', callback_data="50_estrelas")
+    btn_100 = InlineKeyboardButton('⭐️ 100 stars', callback_data="100_estrelas")
+    btn_200 = InlineKeyboardButton('⭐️ 200 stars', callback_data="200_estrelas")
+    btn_300 = InlineKeyboardButton('⭐️ 300 stars', callback_data="300_estrelas")
+    btn_500 = InlineKeyboardButton('⭐️ 500 stars', callback_data="500_estrelas")
+    btn_1000 = InlineKeyboardButton('⭐️ 1000 stars', callback_data="1000_estrelas")
+    btn_cancel = InlineKeyboardButton('Cancelar', callback_data="menu_start")
+    markup.row(btn_50)
+    markup.row(btn_100)
+    markup.row(btn_200)
+    markup.row(btn_300)
+    markup.row(btn_500)
+    markup.row(btn_1000)
+    markup.row(btn_cancel)
+
+    bot.send_message(message.chat.id, text, message_thread_id=message.message_thread_id, reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_handler(call):
+    try:
+        if call.data.startswith('menu_start'):
+            if call.message.chat.type != 'private':
+                return
+            user_id = call.from_user.id
+            first_name = call.from_user.first_name
+            user = search_user(user_id)
+            lang = get_user_lang(user_id)
+
+            # Texto com base na linguagem do usuário
+            text = f"👋 Hello, {first_name}! I'm a bot that helps upload images to Imgur. Send me a photo, and I'll provide you a link to access it."
+            if lang == 'pt-br':
+                text = f"👋 Olá, {first_name}! Eu sou um bot que ajuda a fazer upload de imagens para o Imgur. Envie uma foto, e eu retornarei um link direto para acessá-la."
+
+            # Editando a mensagem existente
+            bot.edit_message_text(
+                chat_id=call.message.chat.id,
+                message_id=call.message.message_id,
+                text=text,
+                parse_mode="HTML"
+            )
+        elif call.data in ["50_estrelas", "100_estrelas", "200_estrelas", "300_estrelas", "500_estrelas", "1000_estrelas"]:
+            try:
+                user_id = call.from_user.id
+                user = search_user(user_id)
+                bot.delete_message(chat_id=call.message.chat.id, message_id=call.message.message_id) 
+                stars_map = {
+                    "50_estrelas": 50, 
+                    "100_estrelas": 100,
+                    "200_estrelas": 200,
+                    "300_estrelas": 300,
+                    "500_estrelas": 500,
+                    "1000_estrelas": 1000
+                }
+                
+                selected_stars = stars_map[call.data]
+                description = (
+                    "You are choosing an amount to contribute to our project! 💖\n\n"
+                    f"Amount= {selected_stars} "
+                )
+
+                markup_stars = InlineKeyboardMarkup()
+                back_to_pay_again = InlineKeyboardButton('↩️ Back', callback_data='pay_again')
+                pay_button = InlineKeyboardButton(f'Purchase ⭐ {selected_stars}', pay=True)
+
+                markup_stars.add(pay_button)
+                markup_stars.add(back_to_pay_again)
+
+                bot.send_invoice(
+                    call.from_user.id,
+                    provider_token=None,  
+                    title=f'Purchase {selected_stars} Stars',
+                    description=description,
+                    currency='XTR',  
+                    prices=[
+                        telebot.LabeledPrice(label=f'{selected_stars} Stars', amount=selected_stars )  
+                    ],
+                    start_parameter=f'stars_{selected_stars}',
+                    invoice_payload=f'stars_{selected_stars}',
+                    reply_markup=markup_stars
+                )        
+            except Exception as e:
+                logging.error(f'Erro ao gerar pagamento: {e}')
+    except Exception as e:
+                logging.error(f'Erro ao callback: {e}')
+
+@bot.message_handler(content_types=['successful_payment'])
+def got_payment(message):
+    payload = message.successful_payment.invoice_payload
+    user_id = message.from_user.id
+    user = search_user(user_id)
+    
+    if not user:
+        logging.error(user_id, "Erro: usuário não encontrado no banco de dados.")
+        return
+
+    if payload == 'stars_50':
+        payload_text = '50 stars'
+    elif payload == 'stars_100':
+        payload_text = '100 stars'
+    elif payload == 'stars_200':
+        payload_text = '200 stars'
+    elif payload == 'stars_300':
+        payload_text = '300 stars'
+    elif payload == 'stars_500':
+        payload_text = '500 stars'
+    elif payload == 'stars_1000':
+        payload_text = '1000 stars'
+    else:
+        bot.send_message(user_id, "Erro: o valor do pagamento não é válido.")
+        return
+    
+    msg_success = (
+        f"🎉 <b>Payment Successful!</b>\n\n"
+        f"You have successfully purchased {payload_text}.\n"
+    )
+
+
+    markup = InlineKeyboardMarkup()
+    back_to_home = InlineKeyboardButton(
+        '↩️ Back', callback_data='menu_start'
+    )
+    markup.add(back_to_home)
+    bot.send_message(
+        chat_id=message.from_user.id,
+        text=msg_success,
+        parse_mode='HTML',
+        reply_markup=markup,
+    )
+
+    user_info = (
+        f"<b>#{bot.get_me().username} #Pagamento</b>\n"
+        f"<b>User:</b> {user.get('first_name', 'Usuário Desconhecido')}\n"
+        f"<b>ID:</b> <code>{user_id}</code>\n"
+        f"<b>Username:</b> @{user.get('username', 'Sem Username')}\n"
+        f"<b>Valor:</b> {payload}\n"
+    )
+    bot.send_message(GROUP_LOG, user_info)
+
+
+@bot.pre_checkout_query_handler(func=lambda query: True)
+def checkout(pre_checkout_query):
+    bot.answer_pre_checkout_query(
+        pre_checkout_query.id,
+        ok=True,
+        error_message='Erro. Tente novamente mais tarde.'
+    )
+
+
 # Inicia o bot
 logging.info("Iniciando o bot...")
 bot.infinity_polling()
