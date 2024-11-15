@@ -230,7 +230,6 @@ def on_left_chat_member(message):
 # Mensagem inicial explicativa sobre o bot
 @bot.message_handler(commands=['start'])
 def start(message):
-    bot.send_chat_action(message.chat.id, 'typing')
     user_id = message.from_user.id
     first_name = message.from_user.first_name
     
@@ -283,7 +282,6 @@ def upload_image_with_retries(image_path, message, retries=5, delay=5):
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
-    bot.send_chat_action(message.chat.id, 'typing')
     if message.chat.type == "private":
         user_lang = get_user_lang(message.from_user.id)
     else:
