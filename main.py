@@ -177,12 +177,11 @@ def send_group_greeting(message: ChatMemberUpdated):
             )
 
             send_new_group_message(message.chat)
-
             try:
                 chat_member = bot.get_chat_member(chat_id, bot.get_me().id)
 
                 if message.chat.type in ["group", "supergroup", "channel"]:
-                        lang = get_group_lang(message.chat.id)
+                        lang = get_group_lang(message.chat.id) or 'en-us'
                         if lang == 'en-us':
                             text_chat = f"Hello! Thanks for adding me to your group.\n\nI will send you an Imgur link every time you send me an image."
                             text_chat_btn_1 = 'Official Channel'
@@ -206,7 +205,6 @@ def send_group_greeting(message: ChatMemberUpdated):
                             text_chat,
                             reply_markup=markup,
                             parse_mode="HTML",
-                            message_thread_id=message.message_thread_id
                         )
 
                 
@@ -266,6 +264,7 @@ def upload_image_with_retries(image_path, message, retries=5, delay=5):
         try:
             # Tente fazer o upload da imagem
             uploaded_image = im.upload_image(image_path, title=f"Uploaded by {message.from_user.username}")
+            print(uploaded_image) 
             return uploaded_image
         except Exception as e:
             # Verifica se o erro é de capacidade (código 429)
@@ -277,6 +276,8 @@ def upload_image_with_retries(image_path, message, retries=5, delay=5):
                 # Se o erro não for de capacidade, lança o erro
                 logging.error(f"Ocorreu um erro inesperado: {e}")
                 raise
+        except KeyError as e:
+            logging.error(f"Erro ao acessar a chave na resposta: {e}")
     # Se atingiu o número máximo de tentativas, retorna None
     return None
 
