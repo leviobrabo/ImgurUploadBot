@@ -511,7 +511,7 @@ def callback_handler(call):
                 )
 
                 markup_stars = InlineKeyboardMarkup()
-                back_to_pay_again = InlineKeyboardButton('↩️ Back', callback_data='pay_again')
+                back_to_pay_again = InlineKeyboardButton('↩️ Back', callback_data='menu_start')
                 pay_button = InlineKeyboardButton(f'Purchase ⭐ {selected_stars}', pay=True)
 
                 markup_stars.add(pay_button)
